@@ -1,42 +1,27 @@
-# This file contains code which consumes a queue from RabbitMQ in the form of (pin_number, status) and uses GPIO.Pi to reflect that state.
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
 
-import pika
-import logging
+import os
+from mqtt_client import PlantgrowerMQTTClient
 
-logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(message)s')
-logger = logging.getLogger(__name__)
-
-connection = pika.BlockingConnection(pika.ConnectionParameters(host='rabbitmq'))
-channel = connection.channel()
-
-channel.exchange_declare(
-    exchange='plantgrower',
-    exchange_type='direct'
-)
-
-result = channel.queue_declare(exclusive=True)
-queue_name = result.method.queue
-
-grow_number = 1
-binding_key = 'to_grow/' + str(grow_number)
-
-channel.queue_bind(
-    exchange='plantgrower',
-    queue=queue_name,
-    routing_key=binding_key
-)
-
-logger.info('Waiting for instructions and sensors...')
+GROW_ID = os.getenv("GROW_ID", "1")
+MOSQUITTO_HOST = os.getenv("MOSQUITTO_HOST", "m2m.eclipse.org")
+MOSQUITTO_PORT = os.getenv("MOSQUITTO_PORT", "1883")
+MOSQUITTO_KEEPALIVE = os.getenv("MOSQUITTO_KEEPALIVE", "60")
 
 
-def callback(ch, method, properties, body):
-    logger.info(f"Received: {body}")
+def on_message_output(mosq, obj, msg):
+    # This callback will only be called for messages with topics that match
+    # grow/id/output/#
+    print(f"MESSAGE: {msg.topic} - {msg.payload}")
 
 
-channel.basic_consume(
-    callback,
-    queue=queue_name,
-    no_ack=True
-)
+# TODO: Parametrise grow_id or use device serial?
+mqttc = PlantgrowerMQTTClient(grow_id=GROW_ID)
 
-channel.start_consuming()
+mqttc.message_callback_add("output", on_message_output)
+# TODO: Add callback for sensor reading
+
+mqttc.connect(MOSQUITTO_HOST, MOSQUITTO_PORT, MOSQUITTO_KEEPALIVE)
+
+mqttc.loop_forever()
