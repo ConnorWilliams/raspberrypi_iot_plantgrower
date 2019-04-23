@@ -22,6 +22,7 @@ mqttc = PlantgrowerMQTTClient(grow_id=GROW_ID)
 mqttc.message_callback_add("output", on_message_output)
 # TODO: Add callback for sensor reading
 
-mqttc.connect(MOSQUITTO_HOST, MOSQUITTO_PORT, MOSQUITTO_KEEPALIVE)
+print(f"Connecting to {MOSQUITTO_HOST} on port {MOSQUITTO_PORT}")
+mqttc.connect(MOSQUITTO_HOST, int(MOSQUITTO_PORT), int(MOSQUITTO_KEEPALIVE))
 
 mqttc.loop_forever()
