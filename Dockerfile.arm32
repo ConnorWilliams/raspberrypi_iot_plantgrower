@@ -1,12 +1,24 @@
-FROM arm32v7/python:3.7-alpine
-RUN apk add build-base
+FROM raspbian/jessie
+
+WORKDIR /usr/src
+RUN apt-get update -y
+RUN apt-get install python3-dev libffi-dev libssl-dev -y
+RUN wget https://www.python.org/ftp/python/3.6.3/Python-3.6.3.tar.xz
+RUN tar xJf Python-3.6.3.tar.xz
+WORKDIR /usr/src/Python-3.6.3
+RUN apt-get install build-essential -y
+RUN ./configure
+RUN make
+RUN make install
+RUN pip3 install --upgrade pip
+
 WORKDIR /usr/src/app
 COPY requirements.txt ./
-RUN pip install -r requirements.txt
+RUN pip3 install -r requirements.txt
 COPY . .
 ENV MOSQUITTO_HOST mosquitto
 ENV MOSQUITTO_PORT 1883
 ENV MOSQUITTO_KEEPALIVE 60
 ENV GROW_ID 1
 ENV GPIOZERO_PIN_FACTORY native
-CMD python -u raspi_consumer.py -h $MOSQUITTO_HOST -p $MOSQUITTO_PORT -k $MOSQUITTO_KEEPALIVE -g $GROW_ID
+CMD python3 -u raspi_consumer.py -h $MOSQUITTO_HOST -p $MOSQUITTO_PORT -k $MOSQUITTO_KEEPALIVE -g $GROW_ID
