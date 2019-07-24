@@ -7,6 +7,7 @@ import re
 import gpiozero
 from gpiozero.pins.mock import MockFactory
 from mqtt_client import PlantgrowerMQTTClient
+from sensors import BME280
 
 
 logger = logging.getLogger(__name__)
@@ -29,28 +30,38 @@ def on_message_output(mosq, obj, msg):
     # This callback will only be called for messages with topics that match
     # grow/id/output/#
     logger.info(f"Message on {msg.topic} on grow {GROW_ID}: {msg.payload}")
-    try:
-        message_string = validate_message(
-            msg.payload,
-            "\((1[1-9]|2[0-7]){1}, (True|False){1}\)"  # ([11-27], True|False)
-        ).replace(" ", "")
-    except ValueError:
-        logger.error(
-            f"Message on {msg.topic} should be in form (pin_number, boolean)"
-        )
-        raise
+    message_string = validate_message(
+        msg.payload,
+        r"^[(](1[1-9]|2[0-7]){1}, (True|False){1}[)]$",  # ([11-27], True|False)
+        "(pin_number, boolean)"
+    ).replace(" ", "")
 
     pin_number, status = tuple(message_string[1:-1].split(","))
     set_output_pin(pin_number, status)
 
 
-def validate_message(message, regex_string):
+def on_message_read(mosq, obj, msg):
+    # This callback will only be called for messages with topics that match
+    # grow/id/read/#
+    logger.info(f"Message on {msg.topic} on grow {GROW_ID}: {msg.payload}")
+    message_string = validate_message(
+        msg.payload,
+        r"^[(](1[1-9]|2[0-7]){1}, (.*)[)]$",  # ([11-27], sensor_type)
+        "(pin_number, sensor_type)"
+    ).replace(" ", "")
+
+    pin_number, sensor_type = tuple(message_string[1:-1].split(","))
+    reading = read_sensor(pin_number, sensor_type)
+    logger.info(reading)
+
+
+def validate_message(message, regex_string, proper_form):
     regex = re.compile(regex_string)
     decoded_message = message.decode("utf-8")
     if regex.match(decoded_message):
         return decoded_message
     else:
-        logger.error(f"Message {message} not valid")
+        logger.error(f"Message {message} not valid. Should be in form {proper_form}")
         raise ValueError
 
 
@@ -69,12 +80,22 @@ def set_output_pin(pin_number, status):
     logger.debug(output_device)
 
 
-mqttc = PlantgrowerMQTTClient(grow_id=GROW_ID)
+def read_sensor(pin_number, sensor_type):
+    SUPPORTED_SENSORS = {
+        'bme280': BME280
+    }
+    return SUPPORTED_SENSORS[sensor_type].read()
 
-mqttc.message_callback_add("output", on_message_output)
-# TODO: Add callback for sensor reading
 
-logger.info(f"Connecting to {MOSQUITTO_HOST} on port {MOSQUITTO_PORT}")
-mqttc.connect(MOSQUITTO_HOST, int(MOSQUITTO_PORT), int(MOSQUITTO_KEEPALIVE))
+if __name__ == "__main__":
+    mqttc = PlantgrowerMQTTClient(grow_id=GROW_ID)
 
-mqttc.loop_forever()
+    mqttc.message_callback_add("output", on_message_output)
+    mqttc.message_callback_add("read", on_message_read)
+
+    mqttc.connect(
+        MOSQUITTO_HOST,
+        int(MOSQUITTO_PORT),
+        int(MOSQUITTO_KEEPALIVE)
+    )
+    mqttc.loop_forever()

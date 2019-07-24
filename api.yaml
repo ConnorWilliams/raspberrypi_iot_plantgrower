@@ -1,0 +1,19 @@
+asyncapi: '2.0.0-rc1'
+id: 'urn:plantgrower:raspberrypi_iot_plantgrower'
+info:
+  title: IoT Plantgrower service
+  version: '0.1.0'
+servers:
+  - url: SERVER_URL
+    protocol: mqtt
+    description: This is the mosquitto broker.
+channels:
+#  The ‘channels’ section of the specification houses all of the mediums where messages flow through.
+#  For example, some systems use ‘topic, ‘event name’ or ‘routing key’.
+#  Different kinds of information flow through each channel similar to the analogy of TV channels.
+  grow:
+    subscribe:
+      message:
+        payload:
+          type: string
+          pattern: "\((1[1-9]|2[0-7]){1}, (True|False){1}\)"
