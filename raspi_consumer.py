@@ -51,6 +51,7 @@ def on_message_read(mosq, obj, msg):
     ).replace(" ", "")
 
     pin_number, sensor_type = tuple(message_string[1:-1].split(","))
+    sensor_type = sensor_type.replace("'", "")
     reading = read_sensor(pin_number, sensor_type)
     logger.info(reading)
 
@@ -81,10 +82,18 @@ def set_output_pin(pin_number, status):
 
 
 def read_sensor(pin_number, sensor_type):
+    sensor_type = sensor_type.lower()
     SUPPORTED_SENSORS = {
         'bme280': BME280
     }
-    return SUPPORTED_SENSORS[sensor_type].read()
+    try:
+        sensor = SUPPORTED_SENSORS[sensor_type]()
+        return sensor.read()
+    except KeyError:
+        raise (
+            f"Unsupported sensor {sensor_type}."
+            f"Should be one of {list(SUPPORTED_SENSORS.keys())}"
+        )
 
 
 if __name__ == "__main__":
